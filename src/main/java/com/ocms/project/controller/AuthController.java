@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.ocms.project.dto.LoginRequest;
 import com.ocms.project.dto.RegisterRequest;
 import com.ocms.project.model.User;
+import com.ocms.project.model.UserStatus;
 import com.ocms.project.service.UserService;
 
 @RestController
@@ -53,12 +54,12 @@ public Object register(@RequestBody RegisterRequest request) {
                     request.email,
                     request.password,
                     request.role,
-                    "ACTIVE"
+                    UserStatus.ACTIVE
             );
 
-            userService.register(user);
+            User savedUser = userService.register(user);
 
-            return "User registered successfully!";
+            return userService.buildSession(savedUser);
 
         } catch (RuntimeException e) {
             return e.getMessage(); // duplicate email message
@@ -76,7 +77,7 @@ public Object register(@RequestBody RegisterRequest request) {
         User user = userService.login(request.email, request.password);
 
         if (user != null) {
-            return user;
+            return userService.buildSession(user);
         } else {
             return "Invalid credentials";
         }

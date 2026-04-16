@@ -27,12 +27,13 @@ public class User {
     @Enumerated(EnumType.STRING)
     private Role role;
 
-    private String status;
+    @Enumerated(EnumType.STRING)
+    private UserStatus status;
 
     // Constructors
     public User() {}
 
-    public User(String name, String email, String password, Role role, String status) {
+    public User(String name, String email, String password, Role role, UserStatus status) {
         this.name = name;
         this.email = email;
         this.password = password;
@@ -56,6 +57,6 @@ public class User {
     public Role getRole() { return role; }
     public void setRole(Role role) { this.role = role; }
 
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
+    public UserStatus getStatus() { return status; }
+    public void setStatus(UserStatus status) { this.status = status; }
 }
