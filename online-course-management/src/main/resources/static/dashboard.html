@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCMS Dashboard</title>
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --secondary: #06b6d4;
+            --bg: #f8fafc;
+            --surface: #ffffff;
+            --text: #111827;
+            --muted: #6b7280;
+            --danger: #dc2626;
+            --success: #16a34a;
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); color: var(--text); }
+        .page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .card { width: 100%; max-width: 920px; background: var(--surface); border-radius: 24px; box-shadow: 0 25px 80px rgba(15,23,42,0.08); overflow: hidden; }
+        .grid { display: grid; grid-template-columns: 1fr 1.1fr; min-height: 540px; }
+        .panel { padding: 40px; }
+        .panel.left { background: linear-gradient(180deg, #4338ca, #2563eb); color: white; }
+        .panel.right { background: var(--surface); }
+        .logo { font-size: 1.4rem; font-weight: 700; margin-bottom: 24px; }
+        .title { font-size: 2.25rem; margin-top: 0; margin-bottom: 16px; line-height: 1.1; }
+        .subtitle { color: rgba(255,255,255,0.82); max-width: 380px; line-height: 1.7; }
+        .note { color: var(--muted); margin-top: 24px; font-size: 0.95rem; }
+        .button { display: inline-flex; align-items: center; justify-content: center; padding: 14px 22px; border: none; border-radius: 12px; cursor: pointer; font-size: 1rem; font-weight: 700; transition: transform 0.2s ease, box-shadow 0.2s ease; }
+        .button.primary { background: linear-gradient(135deg, #4f46e5, #6366f1); color: white; }
+        .button.secondary { background: #eff6ff; color: #1d4ed8; }
+        .button:hover { transform: translateY(-1px); }
+        .form-group { margin-bottom: 18px; }
+        label { display: block; margin-bottom: 8px; font-weight: 600; }
+        input, select { width: 100%; padding: 14px 16px; border: 1px solid #d1d5db; border-radius: 12px; font-size: 1rem; }
+        input:focus, select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79,70,229,0.14); }
+        .role-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 24px; }
+        .role-card { padding: 18px; border-radius: 16px; border: 1px solid #e5e7eb; background: white; color: var(--text); cursor: pointer; text-align: center; transition: border-color 0.2s ease, transform 0.2s ease; }
+        .role-card.active { border-color: var(--primary); box-shadow: 0 8px 24px rgba(79,70,229,0.12); transform: translateY(-2px); }
+        .role-card span { display: block; margin-top: 12px; font-weight: 700; }
+        .message { padding: 14px 18px; border-radius: 12px; margin-bottom: 18px; font-size: 0.95rem; display: none; }
+        .message.success { background: #dcfce7; color: #166534; }
+        .message.error { background: #fee2e2; color: #991b1b; }
+        .hidden { display: none; }
+        .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px; }
+        .topbar h1 { margin: 0; font-size: 1.75rem; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 18px; margin-bottom: 28px; }
+        .stat { background: #fff; border: 1px solid #e5e7eb; border-radius: 18px; padding: 22px; }
+        .stat h3 { margin: 0 0 10px; font-size: 0.95rem; color: var(--muted); }
+        .stat p { margin: 0; font-size: 2rem; font-weight: 700; }
+        .section { background: #fff; border: 1px solid #e5e7eb; border-radius: 18px; padding: 24px; margin-bottom: 22px; }
+        .section h2 { margin-top: 0; font-size: 1.1rem; }
+        .table { width: 100%; border-collapse: collapse; }
+        .table th, .table td { padding: 14px 12px; border-bottom: 1px solid #f3f4f6; text-align: left; }
+        .table th { color: var(--muted); font-size: 0.9rem; }
+        .small-button { padding: 10px 14px; border-radius: 10px; border: none; cursor: pointer; font-weight: 700; }
+        .small-button.primary { background: var(--primary); color: white; }
+        .small-button.secondary { background: #e2e8f0; color: var(--text); }
+        .small-button.success { background: var(--success); color: white; }
+        .small-button.danger { background: var(--danger); color: white; }
+        .toolbar { display: flex; justify-content: flex-end; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+        .section-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 22px; align-items: start; }
+        .stack > * + * { margin-top: 18px; }
+        .pill { display: inline-flex; align-items: center; padding: 6px 10px; border-radius: 999px; background: #eef2ff; color: #3730a3; font-size: 0.85rem; font-weight: 700; }
+        .empty-state { padding: 18px; border-radius: 14px; background: #f8fafc; color: var(--muted); border: 1px dashed #cbd5e1; }
+        body.dashboard-mode {
+            background: linear-gradient(135deg, #e0e7ff 0%, #f8fafc 45%, #dbeafe 100%);
+        }
+        body.dashboard-mode .page {
+            align-items: stretch;
+            padding: 24px;
+        }
+        body.dashboard-mode .card {
+            max-width: 1380px;
+            background: transparent;
+            box-shadow: none;
+            overflow: visible;
+        }
+        body.dashboard-mode .grid {
+            display: block;
+            min-height: auto;
+        }
+        body.dashboard-mode .panel.left {
+            display: none;
+        }
+        body.dashboard-mode .panel.right {
+            padding: 0;
+            background: transparent;
+        }
+        body.dashboard-mode #dashboardPanel {
+            background: rgba(255,255,255,0.95);
+            border: 1px solid rgba(255,255,255,0.75);
+            border-radius: 28px;
+            padding: 28px;
+            box-shadow: 0 25px 60px rgba(37, 99, 235, 0.10);
+            backdrop-filter: blur(14px);
+        }
+        body.dashboard-mode .topbar {
+            background: linear-gradient(135deg, #1e3a8a, #2563eb);
+            color: white;
+            border-radius: 22px;
+            padding: 24px;
+            margin-bottom: 22px;
+        }
+        body.dashboard-mode .topbar p {
+            color: rgba(255,255,255,0.82) !important;
+        }
+        body.dashboard-mode .topbar .button.secondary {
+            background: rgba(255,255,255,0.16);
+            color: white;
+        }
+        body.dashboard-mode .section {
+            box-shadow: 0 12px 32px rgba(15, 23, 42, 0.05);
+        }
+        body.dashboard-mode .stats {
+            margin-bottom: 22px;
+        }
+        @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } .topbar { flex-direction: column; align-items: flex-start; gap: 12px; } }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <div class="card">
+            <div class="grid">
+                <div class="panel left">
+                    <div class="logo">OCMS</div>
+                    <h1 class="title">Professional Course Management</h1>
+                    <p class="subtitle">Secure login, registration, course creation and enrollment powered by your Spring Boot backend.</p>
+                    <div class="note">If login fails, the backend is not running or the credentials are incorrect. Open <strong>http://localhost:8080/dashboard.html</strong>.</div>
+                </div>
+                <div class="panel right">
+                    <div id="authPanel">
+                        <div class="message" id="authMessage"></div>
+                        <div class="form-group">
+                            <label>Choose role</label>
+                            <div class="role-row">
+                                <div class="role-card" id="roleStudent" onclick="selectRole('STUDENT')">
+                                    <div>👨‍🎓</div>
+                                    <span>Student</span>
+                                </div>
+                                <div class="role-card" id="roleInstructor" onclick="selectRole('INSTRUCTOR')">
+                                    <div>👨‍🏫</div>
+                                    <span>Teacher</span>
+                                </div>
+                                <div class="role-card" id="roleAdmin" onclick="selectRole('ADMIN')">
+                                    <div>👨‍💼</div>
+                                    <span>Admin</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group hidden" id="nameGroup">
+                            <label for="nameInput">Full name</label>
+                            <input type="text" id="nameInput" placeholder="Your full name">
+                        </div>
+                        <div class="form-group">
+                            <label for="emailInput">Email</label>
+                            <input type="email" id="emailInput" placeholder="you@example.com">
+                        </div>
+                        <div class="form-group">
+                            <label for="passwordInput">Password</label>
+                            <input type="password" id="passwordInput" placeholder="Password">
+                        </div>
+                        <button class="button primary" id="authSubmitButton" onclick="submitAuth()">Login</button>
+                        <button class="button secondary" style="margin-top: 12px; width: 100%;" onclick="toggleRegister()">Switch to Register</button>
+                        <div class="note" style="margin-top: 20px;">Demo accounts: student@example.com / pass123, teacher@example.com / pass123, admin@example.com / pass123</div>
+                    </div>
+                    <div id="dashboardPanel" class="hidden">
+                        <div class="topbar">
+                            <div>
+                                <h1 id="dashboardTitle">Dashboard</h1>
+                                <p id="dashboardSubtitle" style="margin: 6px 0 0; color: var(--muted);">Welcome back.</p>
+                            </div>
+                            <button class="button secondary" onclick="logout()">Logout</button>
+                        </div>
+                        <div class="stats" id="dashboardStats"></div>
+                        <div class="section" id="studentSection">
+                            <h2>Available Courses</h2>
+                            <table class="table">
+                                <thead>
+                                    <tr><th>ID</th><th>Title</th><th>Type</th><th>Price</th><th>Action</th></tr>
+                                </thead>
+                                <tbody id="courseListBody"></tbody>
+                            </table>
+                        </div>
+                        <div class="section hidden" id="paymentSection">
+                            <h2>Course Payment</h2>
+                            <p id="paymentCourseInfo" style="margin: 0 0 14px 0; color: var(--muted);"></p>
+                            <div class="form-group">
+                                <label for="paymentMethod">Payment Method</label>
+                                <select id="paymentMethod">
+                                    <option value="UPI">UPI</option>
+                                    <option value="CreditCard">CreditCard</option>
+                                    <option value="NetBanking">NetBanking</option>
+                                </select>
+                            </div>
+                            <button class="button primary" id="paymentActionButton" onclick="submitPaymentAndEnroll()">Pay & Enroll</button>
+                            <button class="button secondary" style="margin-left: 12px;" onclick="hidePaymentSection()">Cancel</button>
+                            <p id="paymentStatus" style="margin-top: 12px; color: var(--muted);"></p>
+                        </div>
+                        <div class="section hidden" id="enrolledCoursesSection">
+                            <h2>My Enrolled Courses & Assignments</h2>
+                            <div id="enrolledCoursesBody"></div>
+                        </div>
+                        <div class="section hidden" id="testsSection">
+                            <h2>Tests & Quizzes</h2>
+                            <table class="table">
+                                <thead>
+                                    <tr><th>Test Name</th><th>Course</th><th>Status</th><th>Score</th><th>Action</th></tr>
+                                </thead>
+                                <tbody id="testsBody"></tbody>
+                            </table>
+                        </div>
+                        <div class="section hidden" id="teacherSection">
+                            <h2>Teacher Workspace</h2>
+                            <div class="form-group">
+                                <label for="courseTypeInput">Course Type</label>
+                                <select id="courseTypeInput">
+                                    <option value="FREE">FREE</option>
+                                    <option value="PAID">PAID</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="courseTitleInput">Title</label>
+                                <input type="text" id="courseTitleInput" placeholder="Course title">
+                            </div>
+                            <div class="form-group">
+                                <label for="courseDescriptionInput">Description</label>
+                                <input type="text" id="courseDescriptionInput" placeholder="Brief description">
+                            </div>
+                            <div class="form-group">
+                                <label for="coursePriceInput">Price</label>
+                                <input type="number" id="coursePriceInput" value="0" min="0" step="0.01">
+                            </div>
+                            <button class="button primary" onclick="createCourse()">Create Course</button>
+                            <div id="teacherCoursesContainer" style="margin-top: 24px;"></div>
+                        </div>
+                        <div class="section hidden" id="adminSection">
+                            <h2>Admin Summary</h2>
+                            <div class="stats" id="adminStats"></div>
+                            <div id="adminCoursesContainer" style="margin-top: 24px;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        const API_BASE = 'http://localhost:8080/api';
+        let currentUser = null;
+        let currentRole = null;
+        let isRegisterMode = false;
+        let dashboardState = null;
+
+        function selectRole(role) {
+            currentRole = role;
+            ['STUDENT', 'INSTRUCTOR', 'ADMIN'].forEach(r => {
+                const cardId = r === 'INSTRUCTOR' ? 'roleInstructor' : 'role' + r.charAt(0) + r.slice(1).toLowerCase();
+                const card = document.getElementById(cardId);
+                card.classList.toggle('active', r === role);
+            });
+        }
+
+        function getDashboardMessageNode() {
+            let node = document.getElementById('dashboardMessage');
+            if (!node) {
+                node = document.createElement('div');
+                node.id = 'dashboardMessage';
+                node.className = 'message';
+                document.getElementById('dashboardStats').before(node);
+            }
+            return node;
+        }
+
+        function showMessage(text, type = 'error') {
+            const node = document.getElementById('dashboardPanel').classList.contains('hidden')
+                ? document.getElementById('authMessage')
+                : getDashboardMessageNode();
+            node.textContent = text;
+            node.className = `message ${type}`;
+            node.style.display = 'block';
+        }
+
+        function clearMessage() {
+            [document.getElementById('authMessage'), document.getElementById('dashboardMessage')].forEach(node => {
+                if (node) {
+                    node.style.display = 'none';
+                }
+            });
+        }
+
+        function toggleRegister() {
+            isRegisterMode = !isRegisterMode;
+            document.getElementById('nameGroup').classList.toggle('hidden', !isRegisterMode);
+            document.getElementById('authSubmitButton').textContent = isRegisterMode ? 'Register' : 'Login';
+            document.querySelector('.button.secondary').textContent = isRegisterMode ? 'Switch to Login' : 'Switch to Register';
+            clearMessage();
+        }
+
+        async function submitAuth() {
+            clearMessage();
+            const email = document.getElementById('emailInput').value.trim();
+            const password = document.getElementById('passwordInput').value.trim();
+            if (!currentRole) { showMessage('Select a role first.'); return; }
+            if (!email || !password) { showMessage('Email and password are required.'); return; }
+            if (isRegisterMode) {
+                const name = document.getElementById('nameInput').value.trim();
+                if (!name) { showMessage('Name is required for registration.'); return; }
+                await registerUser({ name, email, password, role: currentRole });
+            } else {
+                await loginUser({ email, password });
+            }
+        }
+
+        async function requestJson(url, options = {}) {
+            const response = await fetch(url, options);
+            const contentType = response.headers.get('content-type') || '';
+            const payload = contentType.includes('application/json')
+                ? await response.json()
+                : await response.text();
+            if (!response.ok) {
+                throw new Error(typeof payload === 'string' ? payload : 'Request failed');
+            }
+            return payload;
+        }
+
+        async function registerUser(body) {
+            try {
+                const session = await requestJson(`${API_BASE}/auth/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                currentUser = session;
+                currentRole = session.role;
+                isRegisterMode = false;
+                setupDashboard();
+                showMessage('Registration complete. Your role profile was created automatically.', 'success');
+            } catch (error) {
+                console.error(error);
+                showMessage(error.message || 'Registration failed.');
+            }
+        }
+
+        async function loginUser(body) {
+            try {
+                const session = await requestJson(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                currentUser = session;
+                currentRole = session.role;
+                setupDashboard();
+            } catch (error) {
+                console.error(error);
+                showMessage(error.message || 'Login failed.');
+            }
+        }
+
+        function logout() {
+            currentUser = null;
+            currentRole = null;
+            dashboardState = null;
+            isRegisterMode = false;
+            document.body.classList.remove('dashboard-mode');
+            document.getElementById('authPanel').classList.remove('hidden');
+            document.getElementById('dashboardPanel').classList.add('hidden');
+            document.getElementById('nameGroup').classList.add('hidden');
+            document.getElementById('authSubmitButton').textContent = 'Login';
+            document.querySelector('.button.secondary').textContent = 'Switch to Register';
+            document.getElementById('emailInput').value = '';
+            document.getElementById('passwordInput').value = '';
+            document.getElementById('nameInput').value = '';
+            document.querySelectorAll('.role-card').forEach(card => card.classList.remove('active'));
+            document.getElementById('courseListBody').innerHTML = '';
+            document.getElementById('enrolledCoursesBody').innerHTML = '';
+            document.getElementById('teacherCoursesContainer').innerHTML = '';
+            document.getElementById('adminCoursesContainer').innerHTML = '';
+            clearMessage();
+        }
+
+        function showSection(role) {
+            document.getElementById('studentSection').classList.toggle('hidden', role !== 'STUDENT');
+            document.getElementById('paymentSection').classList.add('hidden');
+            document.getElementById('enrolledCoursesSection').classList.toggle('hidden', role !== 'STUDENT');
+            document.getElementById('testsSection').classList.toggle('hidden', role !== 'STUDENT');
+            document.getElementById('teacherSection').classList.toggle('hidden', role !== 'INSTRUCTOR');
+            document.getElementById('adminSection').classList.toggle('hidden', role !== 'ADMIN');
+        }
+
+        async function setupDashboard() {
+            document.body.classList.add('dashboard-mode');
+            document.getElementById('authPanel').classList.add('hidden');
+            document.getElementById('dashboardPanel').classList.remove('hidden');
+            document.getElementById('dashboardTitle').textContent = `${currentRole.charAt(0) + currentRole.slice(1).toLowerCase()} Dashboard`;
+            document.getElementById('dashboardSubtitle').textContent = `Logged in as ${currentUser.name || currentUser.email}.`;
+            showSection(currentRole);
+            clearMessage();
+            await refreshDashboard();
+        }
+
+        async function refreshDashboard() {
+            try {
+                if (currentRole === 'STUDENT') {
+                    dashboardState = await requestJson(`${API_BASE}/student/dashboard/${currentUser.userId}`);
+                    renderStudentDashboard(dashboardState);
+                } else if (currentRole === 'INSTRUCTOR') {
+                    dashboardState = await requestJson(`${API_BASE}/teacher/dashboard/${currentUser.userId}`);
+                    renderTeacherDashboard(dashboardState);
+                } else if (currentRole === 'ADMIN') {
+                    dashboardState = await requestJson(`${API_BASE}/admin/dashboard/${currentUser.userId}`);
+                    renderAdminDashboard(dashboardState);
+                }
+            } catch (error) {
+                console.error(error);
+                showMessage(error.message || 'Could not load dashboard data.', 'error');
+            }
+        }
+
+        function formatMoney(value) {
+            return value && value > 0 ? `$${Number(value).toFixed(2)}` : 'Free';
+        }
+
+        function formatDate(value) {
+            return value ? new Date(value).toLocaleDateString() : 'N/A';
+        }
+
+        function renderStats(cards) {
+            document.getElementById('dashboardStats').innerHTML = cards.map(card => `
+                <div class="stat">
+                    <h3>${card.label}</h3>
+                    <p>${card.value}</p>
+                </div>
+            `).join('');
+        }
+
+        function renderStudentDashboard(data) {
+            const enrollmentIds = new Set((data.enrollments || []).map(item => item.course?.courseId));
+            const visibleCourses = (data.availableCourses || [])
+                .filter(course => ['PUBLISHED', 'APPROVED'].includes(course.status));
+
+            renderStats([
+                { label: 'Available Courses', value: visibleCourses.length },
+                { label: 'My Enrollments', value: (data.enrollments || []).length },
+                { label: 'Certificates', value: (data.certificates || []).length },
+                { label: 'Payments', value: (data.payments || []).length }
+            ]);
+
+            document.getElementById('courseListBody').innerHTML = visibleCourses.map(course => `
+                <tr>
+                    <td>${course.courseId}</td>
+                    <td>
+                        <strong>${course.title}</strong><br>
+                        <span style="color: var(--muted);">${course.instructorName || 'Unknown instructor'}</span>
+                    </td>
+                    <td>${course.type}</td>
+                    <td>${formatMoney(course.price)}</td>
+                    <td>
+                        ${enrollmentIds.has(course.courseId)
+                            ? '<span class="small-button secondary">Enrolled</span>'
+                            : course.price > 0
+                                ? `<button class="small-button success" onclick="startCourseEnrollment(${course.courseId}, ${course.price}, '${course.title.replace(/'/g, "\\'")}')">Pay & Enroll</button>`
+                                : `<button class="small-button success" onclick="enrollCourse(${course.courseId})">Enroll</button>`}
+                    </td>
+                </tr>
+            `).join('');
+
+            document.getElementById('enrolledCoursesBody').innerHTML = (data.enrollments || []).length === 0
+                ? '<p style="color: var(--muted);">No enrolled courses yet.</p>'
+                : data.enrollments.map(item => renderStudentEnrollmentCard(item)).join('');
+
+            renderTestsFromEnrollments(data.enrollments || []);
+        }
+
+        function renderStudentEnrollmentCard(item) {
+            const enrollment = item.enrollment;
+            const course = item.course || {};
+            const assignments = item.assignments || [];
+            const contents = item.contents || [];
+            const payments = item.payments || [];
+            const certificates = item.certificates || [];
+            const grades = item.grades || [];
+            const isCompleted = enrollment?.status === 'COMPLETED';
+
+            return `
+                <div style="border: 1px solid #e5e7eb; border-radius: 14px; padding: 18px; margin-bottom: 18px;">
+                    <div style="display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+                        <div>
+                            <h3 style="margin: 0 0 8px 0;">${course.title || ('Course #' + enrollment.courseId)}</h3>
+                            <p style="margin: 0; color: var(--muted);">Instructor: ${course.instructorName || 'Unknown'} | Status: ${enrollment.status}</p>
+                            <p style="margin: 6px 0 0 0; color: var(--muted);">Progress: ${Number(enrollment.progress || 0).toFixed(0)}%</p>
+                        </div>
+                        <div>
+                            ${isCompleted
+                                ? '<span class="small-button success">Completed</span>'
+                                : `<button class="small-button primary" onclick="completeCourse(${enrollment.enrollmentId})">Mark Complete</button>`}
+                        </div>
+                    </div>
+                    <div style="margin-top: 16px;">
+                        <h4 style="margin: 0 0 8px 0;">Course Content</h4>
+                        ${contents.length === 0
+                            ? '<p style="color: var(--muted); margin: 0;">No content uploaded yet.</p>'
+                            : contents.map(content => `<div style="margin-bottom: 8px;"><strong>${content.title}</strong> <span style="color: var(--muted);">(${content.type})</span> <a href="${content.url}" target="_blank" rel="noreferrer">Open</a></div>`).join('')}
+                    </div>
+                    <div style="margin-top: 16px;">
+                        <h4 style="margin: 0 0 8px 0;">Assignments</h4>
+                        ${assignments.length === 0
+                            ? '<p style="color: var(--muted); margin: 0;">No assignments in this course yet.</p>'
+                            : assignments.map(entry => {
+                                const assignment = entry.assignment;
+                                const mySubmission = (entry.submissions || [])[0];
+                                return `
+                                    <div style="border: 1px solid #f3f4f6; border-radius: 10px; padding: 12px; margin-bottom: 10px;">
+                                        <strong>${assignment.title}</strong>
+                                        <div style="color: var(--muted); margin: 4px 0;">Due: ${formatDate(assignment.deadline)}</div>
+                                        <div style="margin-bottom: 8px;">${assignment.description}</div>
+                                        ${mySubmission
+                                            ? `<span class="small-button secondary">Submitted on ${formatDate(mySubmission.submissionDate)}</span>`
+                                            : `
+                                                <textarea id="submission-${assignment.assignmentId}" placeholder="Submit your assignment response..." style="width: 100%; min-height: 90px; padding: 10px; border: 1px solid #d1d5db; border-radius: 8px;"></textarea>
+                                                <button class="small-button success" style="margin-top: 8px;" onclick="submitStudentAssignment(${assignment.assignmentId})">Submit Assignment</button>
+                                            `}
+                                    </div>
+                                `;
+                            }).join('')}
+                    </div>
+                    <div style="margin-top: 16px;">
+                        <h4 style="margin: 0 0 8px 0;">Payments & Certificates</h4>
+                        <div style="color: var(--muted);">Payments: ${payments.length} | Certificates: ${certificates.length} | Grades: ${grades.length}</div>
+                        ${certificates.length > 0
+                            ? certificates.map(cert => `<div style="margin-top: 8px;">Certificate ${cert.certificateNumber} issued on ${formatDate(cert.issuanceDate)}</div>`).join('')
+                            : '<div style="margin-top: 8px; color: var(--muted);">Certificate appears after course completion.</div>'}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderTestsFromEnrollments(enrollments) {
+            const tests = [];
+            enrollments.forEach(item => {
+                (item.assignments || []).forEach(entry => {
+                    tests.push({
+                        id: entry.assignment.assignmentId,
+                        name: entry.assignment.title,
+                        course: item.course?.title || `Course #${item.enrollment.courseId}`,
+                        status: (entry.submissions || []).length > 0 ? 'Submitted' : 'Pending',
+                        score: '-'
+                    });
+                });
+            });
+
+            document.getElementById('testsBody').innerHTML = tests.length === 0
+                ? '<tr><td colspan="5" style="color: var(--muted);">Assignments will appear here as assessment items.</td></tr>'
+                : tests.map(test => `
+                    <tr>
+                        <td>${test.name}</td>
+                        <td>${test.course}</td>
+                        <td>${test.status}</td>
+                        <td>${test.score}</td>
+                        <td><span class="small-button secondary">${test.status}</span></td>
+                    </tr>
+                `).join('');
+        }
+
+        function renderTeacherDashboard(data) {
+            const gradeStats = data.gradeStats || {};
+            const certificateStats = data.certificateStats || {};
+            renderStats([
+                { label: 'My Courses', value: (data.courses || []).length },
+                { label: 'Grade Statistics', value: gradeStats.totalGrades ?? 0 },
+                { label: 'Certificate Statistics', value: certificateStats.totalCertificates ?? 0 },
+                { label: 'Pending Approval', value: certificateStats.pendingCertificates ?? 0 }
+            ]);
+
+            document.getElementById('teacherCoursesContainer').innerHTML = (data.courses || []).length === 0
+                ? `
+                    ${renderTeacherStatsPanel(data)}
+                    <p style="color: var(--muted);">No courses created yet.</p>
+                `
+                : `
+                    ${renderTeacherStatsPanel(data)}
+                    ${data.courses.map(course => renderTeacherCourseCard(course)).join('')}
+                `;
+        }
+
+        function renderTeacherStatsPanel(data) {
+            const gradeStats = data.gradeStats || {};
+            const certificateStats = data.certificateStats || {};
+            return `
+                <div class="section-grid" style="margin-bottom: 22px;">
+                    <div class="section" style="margin-bottom: 0;">
+                        <h2>Grade Statistics</h2>
+                        <div style="color: var(--muted);">Average score: ${Number(gradeStats.averageMarks || 0).toFixed(2)}</div>
+                        <div style="margin-top: 12px;">Total graded submissions: <strong>${gradeStats.totalGrades ?? 0}</strong></div>
+                        <div style="margin-top: 8px;">Pass count: <strong>${gradeStats.passCount ?? 0}</strong></div>
+                        <div style="margin-top: 8px;">Fail count: <strong>${gradeStats.failCount ?? 0}</strong></div>
+                    </div>
+                    <div class="section" style="margin-bottom: 0;">
+                        <h2>Certificate Statistics</h2>
+                        <div style="margin-top: 12px;">Generated: <strong>${certificateStats.totalCertificates ?? 0}</strong></div>
+                        <div style="margin-top: 8px;">Pending teacher approval: <strong>${certificateStats.pendingCertificates ?? 0}</strong></div>
+                        <div style="margin-top: 8px;">Approved: <strong>${certificateStats.approvedCertificates ?? 0}</strong></div>
+                        <div style="margin-top: 8px;">Sent to students: <strong>${certificateStats.issuedCertificates ?? 0}</strong></div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderTeacherCourseCard(course) {
+            const contents = course.contents || [];
+            const assignments = course.assignments || [];
+            const students = course.students || [];
+            const certificates = course.certificates || [];
+            return `
+                <div style="border: 1px solid #e5e7eb; border-radius: 16px; padding: 18px; margin-bottom: 18px;">
+                    <h3 style="margin: 0 0 8px 0;">${course.title}</h3>
+                    <p style="margin: 0 0 8px 0; color: var(--muted);">${course.description}</p>
+                    <p style="margin: 0 0 14px 0; color: var(--muted);">Status: ${course.status} | Price: ${formatMoney(course.price)} | Enrollments: ${course.enrollmentCount}</p>
+                    <button class="small-button primary" onclick="publishTeacherCourse(${course.courseId})">Publish</button>
+                    <button class="small-button secondary" style="margin-left: 8px;" onclick="toggleInlineForm('content-form-${course.courseId}')">Add Content</button>
+                    <button class="small-button secondary" style="margin-left: 8px;" onclick="toggleInlineForm('assignment-form-${course.courseId}')">Add Assignment</button>
+                    <div id="content-form-${course.courseId}" class="hidden" style="margin-top: 14px;">
+                        <input id="content-title-${course.courseId}" placeholder="Content title" style="margin-bottom: 8px;">
+                        <input id="content-type-${course.courseId}" placeholder="Content type" style="margin-bottom: 8px;">
+                        <input id="content-url-${course.courseId}" placeholder="Content URL" style="margin-bottom: 8px;">
+                        <button class="small-button success" onclick="uploadCourseContent(${course.courseId})">Save Content</button>
+                    </div>
+                    <div id="assignment-form-${course.courseId}" class="hidden" style="margin-top: 14px;">
+                        <input id="assignment-title-${course.courseId}" placeholder="Assignment title" style="margin-bottom: 8px;">
+                        <input id="assignment-description-${course.courseId}" placeholder="Assignment description" style="margin-bottom: 8px;">
+                        <input id="assignment-deadline-${course.courseId}" type="date" style="margin-bottom: 8px;">
+                        <input id="assignment-marks-${course.courseId}" type="number" min="1" step="1" placeholder="Total marks" style="margin-bottom: 8px;">
+                        <button class="small-button success" onclick="createCourseAssignment(${course.courseId})">Save Assignment</button>
+                    </div>
+                    <div style="margin-top: 16px;">
+                        <h4 style="margin: 0 0 8px 0;">Contents</h4>
+                        ${contents.length === 0
+                            ? '<p style="color: var(--muted); margin: 0;">No content yet.</p>'
+                            : contents.map(content => `<div style="margin-bottom: 6px;">${content.title} <span style="color: var(--muted);">(${content.type})</span></div>`).join('')}
+                    </div>
+                    <div style="margin-top: 16px;">
+                        <h4 style="margin: 0 0 8px 0;">Assignments</h4>
+                        ${assignments.length === 0
+                            ? '<p style="color: var(--muted); margin: 0;">No assignments yet.</p>'
+                            : assignments.map(entry => `
+                                <div style="border: 1px solid #f3f4f6; border-radius: 10px; padding: 12px; margin-bottom: 10px;">
+                                    <strong>${entry.assignment.title}</strong>
+                                    <div style="color: var(--muted); margin: 4px 0;">Due: ${formatDate(entry.assignment.deadline)} | Submissions: ${(entry.submissions || []).length}</div>
+                                    <div style="margin-top: 12px;">
+                                        ${(entry.submissions || []).length === 0
+                                            ? '<div style="color: var(--muted);">Students have not submitted this assignment yet.</div>'
+                                            : entry.submissions.map(item => {
+                                                const submission = item.submission || {};
+                                                const user = item.user || {};
+                                                const grade = item.grade;
+                                                const certificate = item.certificate;
+                                                return `
+                                                    <div style="border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; margin-top: 10px; background: #f8fafc;">
+                                                        <div style="display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+                                                            <div>
+                                                                <strong>${user.name || ('Student #' + submission.studentId)}</strong>
+                                                                <div style="color: var(--muted); margin-top: 4px;">${user.email || ''}</div>
+                                                                <div style="color: var(--muted); margin-top: 4px;">Submitted: ${formatDate(submission.submissionDate)} | Status: ${submission.status || 'SUBMITTED'}</div>
+                                                            </div>
+                                                            <div class="pill">${grade ? ('Grade: ' + (grade.marksObtained ?? 0) + '/' + (grade.totalMarks ?? entry.assignment.totalMarks)) : 'Not graded yet'}</div>
+                                                        </div>
+                                                        <div style="margin-top: 10px; color: #111827;">${submission.submissionContent || 'No submission content.'}</div>
+                                                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px;">
+                                                            <input id="grade-marks-${submission.submissionId}" type="number" min="0" step="0.01" placeholder="Marks obtained" value="${grade?.marksObtained ?? ''}">
+                                                            <input id="grade-total-${submission.submissionId}" type="number" min="1" step="0.01" placeholder="Total marks" value="${grade?.totalMarks ?? entry.assignment.totalMarks ?? ''}">
+                                                        </div>
+                                                        <textarea id="grade-feedback-${submission.submissionId}" placeholder="Teacher feedback" style="width: 100%; min-height: 70px; margin-top: 10px; padding: 10px; border: 1px solid #d1d5db; border-radius: 8px;">${grade?.feedback || ''}</textarea>
+                                                        <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px;">
+                                                            <button class="small-button primary" onclick="gradeTeacherSubmission(${entry.assignment.assignmentId}, ${submission.submissionId})">Save Grade</button>
+                                                            <button class="small-button success" onclick="allotTeacherCertificate(${entry.assignment.assignmentId}, ${submission.submissionId})">Allot Certificate</button>
+                                                            ${certificate && certificate.approvalStatus === 'PENDING'
+                                                                ? `<button class="small-button secondary" onclick="approveTeacherCertificate(${certificate.certificateId})">Approve Certificate</button>`
+                                                                : ''}
+                                                            ${certificate && certificate.approvalStatus === 'APPROVED' && certificate.status !== 'ISSUED'
+                                                                ? `<button class="small-button success" onclick="sendTeacherCertificate(${certificate.certificateId})">Send To Student</button>`
+                                                                : ''}
+                                                        </div>
+                                                        <div style="margin-top: 10px; color: var(--muted);">
+                                                            ${certificate
+                                                                ? `Certificate: ${certificate.certificateNumber} | Approval: ${certificate.approvalStatus} | Status: ${certificate.status}`
+                                                                : 'Certificate not allotted yet.'}
+                                                        </div>
+                                                    </div>
+                                                `;
+                                            }).join('')}
+                                    </div>
+                                </div>
+                            `).join('')}
+                    </div>
+                    <div style="margin-top: 16px;">
+                        <h4 style="margin: 0 0 8px 0;">Students via Enrollment</h4>
+                        ${students.length === 0
+                            ? '<p style="color: var(--muted); margin: 0;">No enrolled students yet.</p>'
+                            : students.map(item => `<div style="margin-bottom: 8px;">${item.user.name} (${item.user.email}) - ${item.enrollment.status}, ${Number(item.enrollment.progress || 0).toFixed(0)}%</div>`).join('')}
+                    </div>
+                    <div style="margin-top: 16px;">
+                        <h4 style="margin: 0 0 8px 0;">Certificates</h4>
+                        ${certificates.length === 0
+                            ? '<p style="color: var(--muted); margin: 0;">No certificates allotted for this course yet.</p>'
+                            : certificates.map(certificate => `<div style="margin-bottom: 8px;">${certificate.certificateNumber} - Student #${certificate.studentId} - ${certificate.approvalStatus} / ${certificate.status}</div>`).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        async function gradeTeacherSubmission(assignmentId, submissionId) {
+            const marks = document.getElementById(`grade-marks-${submissionId}`).value.trim();
+            const totalMarks = document.getElementById(`grade-total-${submissionId}`).value.trim();
+            const feedback = document.getElementById(`grade-feedback-${submissionId}`).value.trim();
+            if (!marks || !totalMarks) {
+                showMessage('Enter both obtained marks and total marks before grading.', 'error');
+                return;
+            }
+            try {
+                const params = new URLSearchParams({
+                    submissionId,
+                    marksObtained: marks,
+                    totalMarks,
+                    teacherId: currentUser.teacherId
+                });
+                if (feedback) {
+                    params.set('feedback', feedback);
+                }
+                const response = await requestJson(`${API_BASE}/teacher/assignment/${assignmentId}/grade?${params.toString()}`, { method: 'POST' });
+                showMessage(response.message || 'Grade saved successfully.', 'success');
+                await refreshDashboard();
+            } catch (error) {
+                console.error(error);
+                showMessage(error.message || 'Could not save grade.', 'error');
+            }
+        }
+
+        async function allotTeacherCertificate(assignmentId, submissionId) {
+            try {
+                const response = await requestJson(`${API_BASE}/teacher/assignment/${assignmentId}/certificate/allot?submissionId=${submissionId}&teacherId=${currentUser.teacherId}`, { method: 'POST' });
+                showMessage(response.message || 'Certificate allotted successfully.', 'success');
+                await refreshDashboard();
+            } catch (error) {
+                console.error(error);
+                showMessage(error.message || 'Could not allot certificate.', 'error');
+            }
+        }
+
+        async function approveTeacherCertificate(certificateId) {
+            try {
+                const response = await requestJson(`${API_BASE}/teacher/certificate/${certificateId}/approve?teacherId=${currentUser.teacherId}&comments=${encodeURIComponent('Approved by teacher')}`, { method: 'POST' });
+                showMessage(response.message || 'Certificate approved successfully.', 'success');
+                await refreshDashboard();
+            } catch (error) {
+                console.error(error);
+                showMessage(error.message || 'Could not approve certificate.', 'error');
+            }
+        }
+
+        async function sendTeacherCertificate(certificateId) {
+            try {
+                const response = await requestJson(`${API_BASE}/teacher/certificate/${certificateId}/send`, { method: 'POST' });
+                showMessage(response.message || 'Certificate sent to student.', 'success');
+                await refreshDashboard();
+            } catch (error) {
+                console.error(error);
+                showMessage(error.message || 'Could not send certificate.', 'error');
+            }
+        }
+
+        function renderAdminDashboard(data) {
+            const stats = data.stats || {};
+            renderStats([
+                { label: 'Total Users', value: stats.totalUsers ?? 0 },
+                { label: 'Total Courses', value: stats.totalCourses ?? 0 },
+                { label: 'Enrollments', value: stats.totalEnrollments ?? 0 },
+                { label: 'Reports', value: stats.reportsGenerated ?? 0 }
+            ]);
+
+            document.getElementById('adminStats').innerHTML = `
+                <div class="stat"><h3>Approved Courses</h3><p>${stats.approvedCourses ?? 0}</p></div>
+                <div class="stat"><h3>Published Courses</h3><p>${stats.publishedCourses ?? 0}</p></div>
+                <div class="stat"><h3>System Status</h3><p>${stats.status ?? 'Operational'}</p></div>
+            `;
+
+            // Build HTML content
+            let htmlContent = '';
+
+            // Add Reports Toolbar
+            const courseOptions = (data.courses || []).map(c => `<option value="${c.title}">${c.title}</option>`).join('');
+            htmlContent += `
+                <div style="border: 1px solid #e5e7eb; border-radius: 14px; padding: 18px; margin-bottom: 16px; background: linear-gradient(135deg, #f0f9ff 0%, #fef3c7 100%);">
+                    <h3 style="margin: 0 0 14px 0; color: #1e40af;">📊 Generate Reports</h3>
+                    <div style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
+                        <div style="flex: 1; min-width: 200px;">
+                            <label style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.9rem;">Select Course</label>
+                            <select id="adminCourseSelect" style="width: 100%; padding: 12px 14px; border: 1px solid #d1d5db; border-radius: 12px; font-size: 1rem;">
+                                <option value="">-- Choose a course --</option>
+                                ${courseOptions}
+                            </select>
+                        </div>
+                        <button class="small-button primary" style="padding: 12px 24px;" onclick="generateSimpleReport()">Generate Report</button>
+                        <button class="small-button secondary" style="padding: 12px 24px;" onclick="viewAllReports()">View All Reports</button>
+                    </div>
+                </div>
+            `;
+
+            // Report Results Section
+            htmlContent += `
+                <div id="reportResultsPanel" class="hidden" style="border: 1px solid #10b981; border-radius: 14px; padding: 18px; margin-bottom: 16px; background: #f0fdf4;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <h3 style="margin: 0; color: #065f46;">Report Generated</h3>
+                        <button class="small-button secondary" onclick="hideReportResults()">Close</button>
+                    </div>
+                    <div style="background: white; border-radius: 10px; padding: 16px; border: 1px solid #d1fae5; max-height: 500px; overflow-y: auto;">
+                        <pre id="reportContent" style="margin: 0; white-space: pre-wrap; word-wrap: break-word; font-size: 0.9rem; color: #1f2937;"></pre>
+                    </div>
+                    <button class="small-button success" style="margin-top: 12px;" onclick="downloadReport()">Download Report</button>
+                </div>
+            `;
+
+            // Reports View Section
+            htmlContent += `
+                <div id="reportsViewPanel" class="hidden" style="border: 1px solid #e5e7eb; border-radius: 14px; padding: 18px; margin-bottom: 16px; background: white;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <h3 style="margin: 0;">Generated Reports</h3>
+                        <button class="small-button secondary" onclick="hideReportsPanel()">Close</button>
+                    </div>
+                    <div id="reportsListContainer" style="max-height: 400px; overflow-y: auto;"></div>
+                </div>
+            `;
+
+            // Add Courses Section
+            htmlContent += `<h3 style="margin-top: 24px; margin-bottom: 16px;">Manage Courses</h3>`;
+            
+            if ((data.courses || []).length === 0) {
+                htmlContent += '<p style="color: var(--muted);">No courses available to manage.</p>';
+            } else {
+                htmlContent += data.courses.map(course => `
+                    <div style="border: 1px solid #e5e7eb; border-radius: 14px; padding: 18px; margin-bottom: 16px; background: #fff;">
+                        <h3 style="margin: 0 0 8px 0;">${course.title} (${course.status})</h3>
+                        <p style="margin: 0 0 8px 0; color: var(--muted);">Instructor: ${course.instructorName || 'Unknown'} | Price: ${formatMoney(course.price)}</p>
+                        <p style="margin: 0 0 12px 0; color: var(--muted);">Contents: ${(course.contents || []).length} | Assignments: ${(course.assignments || []).length} | Enrollments: ${(course.enrollments || []).length}</p>
+                        <button class="small-button success" onclick="approveCourse(${course.courseId})">Approve</button>
+                        <button class="small-button danger" style="margin-left: 10px;" onclick="removeCourse(${course.courseId})">Remove</button>
+                    </div>
+                `).join('');
+            }
+
+            document.getElementById('adminCoursesContainer').innerHTML = htmlContent;
+        }
+
+        function toggleInlineForm(id) {
+            document.getElementById(id).classList.toggle('hidden');
+        }
+
+        function startCourseEnrollment(courseId, coursePrice, courseTitle) {
+            document.getElementById('paymentSection').classList.remove('hidden');
+            document.getElementById('paymentCourseInfo').textContent = `Pay $${Number(coursePrice).toFixed(2)} to enroll in ${courseTitle}.`;
+            document.getElementById('paymentActionButton').dataset.courseId = courseId;
+            document.getElementById('paymentActionButton').dataset.coursePrice = coursePrice;
+            document.getElementById('paymentStatus').textContent = '';
+        }
+
+        function hidePaymentSection() {
+            document.getElementById('paymentSection').classList.add('hidden');
+            document.getElementById('paymentCourseInfo').textContent = '';
+            document.getElementById('paymentActionButton').dataset.courseId = '';
+            document.getElementById('paymentActionButton').dataset.coursePrice = '';
+            document.getElementById('paymentStatus').textContent = '';
+        }
+
+        async function enrollCourse(courseId) {
+            try {
+                const text = await requestJson(`${API_BASE}/student/enroll?studentId=${currentUser.studentId}&courseId=${courseId}`, { method: 'POST' });
+                showMessage(typeof text === 'string' ? text : 'Enrollment complete.', 'success');
+                await refreshDashboard();
+            } catch (error) {
+                console.error(error);
+                showMessage(error.message || 'Enrollment failed.', 'error');
+            }
+        }
+
+        async function submitPaymentAndEnroll() {
+            const button = document.getElementById('paymentActionButton');
+            const courseId = button.dataset.courseId;
+            const method = document.getElementById('paymentMethod').value;
+            if (!courseId) { showMessage('Choose a course to pay for.', 'error'); return; }
+            try {
+                document.getElementById('paymentStatus').textContent = `Processing ${method} payment...`;
+                const text = await requestJson(`${API_BASE}/student/enroll?studentId=${currentUser.studentId}&courseId=${courseId}&payNow=true&paymentMethod=${encodeURIComponent(method)}`, { method: 'POST' });
+                hidePaymentSection();
+                showMessage(typeof text === 'string' ? text : 'Payment successful.', 'success');
+                await refreshDashboard();
+            } catch (error) {
+                console.error(error);
+                document.getElementById('paymentStatus').textContent = '';
+                showMessage(error.message || 'Payment failed.', 'error');
+            }
+        }
+
+        async function completeCourse(enrollmentId) {
+            try {
+                await requestJson(`${API_BASE}/student/enrollment/${enrollmentId}/progress?progress=100`, { method: 'POST' });
+                showMessage('Course marked as completed.', 'success');
+                await refreshDashboard();
+            } catch (error) {
+                console.error(error);
+                showMessage(error.message || 'Could not update progress.', 'error');
+            }
+        }
+
+        async function submitStudentAssignment(assignmentId) {
+            const textarea = document.getElementById(`submission-${assignmentId}`);
+            const content = textarea ? textarea.value.trim() : '';
+            if (!content) { showMessage('Please enter your assignment response.', 'error'); return; }
+            try {
+                const params = new URLSearchParams({
+                    assignmentId: assignmentId,
+                    studentId: currentUser.studentId,
+                    content: content
+                });
+                const text = await requestJson(`${API_BASE}/submission/create?${params.toString()}`, { method: 'POST' });
+                showMessage(typeof text === 'string' ? text : 'Assignment submitted.', 'success');
+                await refreshDashboard();
+            } catch (error) {
+                console.error(error);
+                showMessage(error.message || 'Could not submit assignment.', 'error');
+            }
+        }
+
+        async function createCourse() {
+            const title = document.getElementById('courseTitleInput').value.trim();
+            const description = document.getElementById('courseDescriptionInput').value.trim();
+            const price = parseFloat(document.getElementById('coursePriceInput').value || 0);
+            if (!title || !description) { showMessage('Title and description are required.', 'error'); return; }
+            try {
+                const text = await requestJson(`${API_BASE}/teacher/course/create?instructorId=${currentUser.teacherId}&title=${encodeURIComponent(title)}&description=${encodeURIComponent(description)}&price=${price}`, { method: 'POST' });
+                document.getElementById('courseTitleInput').value = '';
+                document.getElementById('courseDescriptionInput').value = '';
+                document.getElementById('coursePriceInput').value = '0';
+                showMessage(typeof text === 'string' ? text : 'Course created.', 'success');
+                await refreshDashboard();
+            } catch (error) {
+                console.error(error);
+                showMessage(error.message || 'Could not create course.', 'error');
+            }
+        }
+
+        async function uploadCourseContent(courseId) {
+            const title = document.getElementById(`content-title-${courseId}`).value.trim();
+            const type = document.getElementById(`content-type-${courseId}`).value.trim();
+            const url = document.getElementById(`content-url-${courseId}`).value.trim();
+            if (!title || !type || !url) { showMessage('Fill all content fields.', 'error'); return; }
+            try {
+                const text = await requestJson(`${API_BASE}/teacher/course/${courseId}/content?title=${encodeURIComponent(title)}&type=${encodeURIComponent(type)}&url=${encodeURIComponent(url)}`, { method: 'POST' });
+                showMessage(typeof text === 'string' ? text : 'Content uploaded.', 'success');
+                await refreshDashboard();
+            } catch (error) {
+                console.error(error);
+                showMessage(error.message || 'Could not upload content.', 'error');
+            }
+        }
+
+        async function createCourseAssignment(courseId) {
+            const title = document.getElementById(`assignment-title-${courseId}`).value.trim();
+            const description = document.getElementById(`assignment-description-${courseId}`).value.trim();
+            const deadlineValue = document.getElementById(`assignment-deadline-${courseId}`).value;
+            const totalMarks = parseFloat(document.getElementById(`assignment-marks-${courseId}`).value || 0);
+            if (!title || !description || !deadlineValue || !totalMarks) { showMessage('Fill all assignment fields.', 'error'); return; }
+            const deadline = new Date(`${deadlineValue}T00:00:00`).getTime();
+            try {
+                const text = await requestJson(`${API_BASE}/teacher/course/${courseId}/assignment/create?teacherId=${currentUser.teacherId}&title=${encodeURIComponent(title)}&description=${encodeURIComponent(description)}&deadline=${deadline}&totalMarks=${totalMarks}`, { method: 'POST' });
+                showMessage(typeof text === 'string' ? text : 'Assignment created.', 'success');
+                await refreshDashboard();
+            } catch (error) {
+                console.error(error);
+                showMessage(error.message || 'Could not create assignment.', 'error');
+            }
+        }
+
+        async function publishTeacherCourse(courseId) {
+            try {
+                const text = await requestJson(`${API_BASE}/teacher/course/${courseId}/publish`, { method: 'POST' });
+                showMessage(typeof text === 'string' ? text : 'Course published.', 'success');
+                await refreshDashboard();
+            } catch (error) {
+                console.error(error);
+                showMessage(error.message || 'Could not publish course.', 'error');
+            }
+        }
+
+        async function approveCourse(courseId) {
+            try {
+                const text = await requestJson(`${API_BASE}/admin/course/${courseId}/approve`, { method: 'POST' });
+                showMessage(typeof text === 'string' ? text : 'Course approved.', 'success');
+                await refreshDashboard();
+            } catch (error) {
+                console.error(error);
+                showMessage(error.message || 'Could not approve course.', 'error');
+            }
+        }
+
+        async function removeCourse(courseId) {
+            try {
+                const text = await requestJson(`${API_BASE}/admin/course/${courseId}/remove`, { method: 'POST' });
+                showMessage(typeof text === 'string' ? text : 'Course removed.', 'success');
+                await refreshDashboard();
+            } catch (error) {
+                console.error(error);
+                showMessage(error.message || 'Could not remove course.', 'error');
+            }
+        }
+
+        // ===================== REPORT GENERATION FUNCTIONS =====================
+
+        let currentReport = null;
+
+        async function generateSimpleReport() {
+            const courseTitle = document.getElementById('adminCourseSelect').value.trim();
+            if (!courseTitle) {
+                showMessage('Please select a course.', 'error');
+                return;
+            }
+
+            const params = new URLSearchParams();
+            params.set('adminId', currentUser.adminId);
+            params.set('reportType', 'COURSE_OVERVIEW');
+            params.set('courseTitle', courseTitle);
+
+            console.log('Generating report for course:', courseTitle, 'Admin:', currentUser.adminId);
+            await generateReport(`${API_BASE}/admin/report/generate?${params.toString()}`, `${courseTitle} Report`);
+        }
+
+        async function generateReport(url, reportTitle) {
+            try {
+                showMessage('Generating report...', 'success');
+                console.log('Report URL:', url);
+                const response = await requestJson(url, { method: 'POST' });
+                console.log('Report response:', response);
+                
+                if (response.success) {
+                    currentReport = {
+                        title: reportTitle,
+                        content: response.reportContent,
+                        reportId: response.reportId,
+                        timestamp: new Date().toLocaleString()
+                    };
+                    
+                    displayReportResults();
+                    showMessage('Report generated successfully! Check view all reports.', 'success');
+                    setTimeout(() => viewAllReports(), 500);
+                } else {
+                    showMessage(response.message || 'Failed to generate report.', 'error');
+                    console.error('Report generation failed:', response.message);
+                }
+            } catch (error) {
+                console.error('Report error:', error);
+                showMessage(error.message || 'Could not generate report.', 'error');
+            }
+        }
+
+        function displayReportResults() {
+            if (!currentReport) return;
+            
+            const panel = document.getElementById('reportResultsPanel');
+            document.getElementById('reportContent').textContent = `
+${currentReport.title}
+Generated: ${currentReport.timestamp}
+Report ID: ${currentReport.reportId}
+${'='.repeat(60)}
+
+${currentReport.content}
+            `.trim();
+            
+            panel.classList.remove('hidden');
+        }
+
+        function hideReportResults() {
+            document.getElementById('reportResultsPanel').classList.add('hidden');
+            currentReport = null;
+        }
+
+        function downloadReport() {
+            if (!currentReport) return;
+            
+            const content = `${currentReport.title}\nGenerated: ${currentReport.timestamp}\nReport ID: ${currentReport.reportId}\n${'='.repeat(60)}\n\n${currentReport.content}`;
+            const element = document.createElement('a');
+            element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(content));
+            element.setAttribute('download', `Report_${currentReport.reportId}_${Date.now()}.txt`);
+            element.style.display = 'none';
+            document.body.appendChild(element);
+            element.click();
+            document.body.removeChild(element);
+            showMessage('Report downloaded successfully!', 'success');
+        }
+
+        async function viewAllReports() {
+            try {
+                console.log('Fetching reports for admin:', currentUser.adminId);
+                const response = await requestJson(`${API_BASE}/admin/reports/${currentUser.adminId}`, { method: 'GET' });
+                console.log('Reports response:', response);
+                
+                if (response.success) {
+                    const panel = document.getElementById('reportsViewPanel');
+                    const container = document.getElementById('reportsListContainer');
+                    
+                    console.log('Number of reports:', response.reports ? response.reports.length : 0);
+                    if (response.reports && response.reports.length > 0) {
+                        container.innerHTML = response.reports.map((report, index) => `
+                            <div style="border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; margin-bottom: 12px; background: #f9fafb;">
+                                <div style="display: flex; justify-content: space-between; align-items: start;">
+                                    <div>
+                                        <h4 style="margin: 0 0 6px 0;">${report.reportType}</h4>
+                                        <p style="margin: 0 0 4px 0; font-size: 0.85rem; color: var(--muted);">
+                                            Report ID: ${report.reportId}
+                                        </p>
+                                        <p style="margin: 0; font-size: 0.85rem; color: var(--muted);">
+                                            Generated: ${formatDate(report.generatedDate)} | Status: ${report.status}
+                                        </p>
+                                    </div>
+                                    <button class="small-button secondary" style="font-size: 0.85rem;" onclick="viewReportDetails(${index})">View</button>
+                                </div>
+                            </div>
+                        `).join('');
+                    } else {
+                        container.innerHTML = '<p style="color: var(--muted); margin: 0;">No reports generated yet.</p>';
+                    }
+                    
+                    panel.classList.remove('hidden');
+                } else {
+                    showMessage(response.message || 'Could not load reports.', 'error');
+                    console.error('Error loading reports:', response.message);
+                }
+            } catch (error) {
+                console.error('Reports fetch error:', error);
+                showMessage(error.message || 'Could not load reports.', 'error');
+            }
+        }
+
+        function hideReportsPanel() {
+            document.getElementById('reportsViewPanel').classList.add('hidden');
+        }
+
+        function viewReportDetails(index) {
+            // This can be enhanced to show full report details
+            showMessage('Report details feature coming soon.', 'success');
+        }
+    </script>
+</body>
+</html>
