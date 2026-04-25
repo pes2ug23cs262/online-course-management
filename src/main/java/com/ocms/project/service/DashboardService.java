@@ -1,6 +1,5 @@
 package com.ocms.project.service;
 
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -109,16 +108,6 @@ public class DashboardService {
                     CourseEntity course = coursesById.get(enrollment.getCourseId());
                     List<Assignment> assignments = assignmentService.getAssignmentsByCourse(enrollment.getCourseId());
                     List<Content> contents = contentService.getContentForCourse(enrollment.getCourseId());
-                    boolean completed = enrollment.getStatus() == EnrollmentStatus.COMPLETED;
-                    if (completed && certsByCourse.getOrDefault(enrollment.getCourseId(), List.of()).isEmpty()) {
-                        Grade grade = gradingService.getGradeForStudentCourse(studentId, enrollment.getCourseId());
-                        double score = grade != null && grade.getTotalMarks() != null && grade.getTotalMarks() > 0
-                                ? (grade.getMarksObtained() / grade.getTotalMarks()) * 100.0
-                                : enrollment.getProgress() != null ? enrollment.getProgress() : 100.0;
-                        Certificate cert = certificateService.issueCertificate(studentId, enrollment.getCourseId(), score);
-                        certsByCourse.computeIfAbsent(enrollment.getCourseId(), key -> new ArrayList<>()).add(cert);
-                    }
-
                     Map<String, Object> item = new LinkedHashMap<>();
                     item.put("enrollment", enrollment);
                     item.put("course", course == null ? null : toCourseMap(course));
@@ -159,12 +148,18 @@ public class DashboardService {
 
         Long teacherId = teacher.getTeacherId();
         List<CourseEntity> courses = courseService.getCoursesByInstructor(teacherId);
+        List<Grade> teacherGrades = gradingService.getGradesByTeacher(teacherId);
+        List<Certificate> teacherCertificates = certificateService.getTeacherCertificates(teacherId);
         List<Map<String, Object>> courseDetails = courses.stream()
                 .sorted(Comparator.comparing(CourseEntity::getCreatedDate, Comparator.nullsLast(Comparator.naturalOrder())).reversed())
                 .map(course -> {
                     List<Content> contents = contentService.getContentForCourse(course.getCourseId());
                     List<Assignment> assignments = assignmentService.getAssignmentsByCourse(course.getCourseId());
                     List<EnrollmentRecord> enrollments = enrollmentService.getEnrollmentsForCourse(course.getCourseId());
+                    List<Grade> courseGrades = gradingService.getCourseGrades(course.getCourseId());
+                    List<Certificate> courseCertificates = teacherCertificates.stream()
+                            .filter(certificate -> course.getCourseId().equals(certificate.getCourseId()))
+                            .toList();
                     List<Map<String, Object>> students = enrollments.stream()
                             .map(record -> {
                                 Student student = studentService.getStudentById(record.getStudentId());
@@ -175,9 +170,13 @@ public class DashboardService {
                                 studentMap.put("student", student);
                                 studentMap.put("user", student.getUser());
                                 studentMap.put("enrollment", record);
-                                studentMap.put("grades", gradingService.getCourseGrades(course.getCourseId()).stream()
+                                studentMap.put("grades", courseGrades.stream()
                                         .filter(grade -> grade.getStudentId().equals(record.getStudentId()))
                                         .toList());
+                                studentMap.put("certificate", courseCertificates.stream()
+                                        .filter(certificate -> certificate.getStudentId().equals(record.getStudentId()))
+                                        .findFirst()
+                                        .orElse(null));
                                 return studentMap;
                             })
                             .filter(item -> item != null)
@@ -189,19 +188,55 @@ public class DashboardService {
                             .map(assignment -> {
                                 Map<String, Object> assignmentMap = new LinkedHashMap<>();
                                 assignmentMap.put("assignment", assignment);
-                                assignmentMap.put("submissions", submissionService.getSubmissionsForAssignment(assignment.getAssignmentId()));
+                                assignmentMap.put("submissions", submissionService.getSubmissionsForAssignment(assignment.getAssignmentId()).stream()
+                                        .map(submission -> {
+                                            Map<String, Object> submissionMap = new LinkedHashMap<>();
+                                            Student student = studentService.getStudentById(submission.getStudentId());
+                                            Grade grade = gradingService.getGradeForSubmission(submission.getSubmissionId());
+                                            Certificate certificate = courseCertificates.stream()
+                                                    .filter(item -> item.getStudentId().equals(submission.getStudentId()))
+                                                    .findFirst()
+                                                    .orElse(null);
+                                            submissionMap.put("submission", submission);
+                                            submissionMap.put("student", student);
+                                            submissionMap.put("user", student != null ? student.getUser() : null);
+                                            submissionMap.put("grade", grade);
+                                            submissionMap.put("certificate", certificate);
+                                            submissionMap.put("canAllotCertificate", grade != null && "PASS".equals(grade.getGradeStatus()));
+                                            return submissionMap;
+                                        })
+                                        .toList());
                                 return assignmentMap;
                             })
                             .toList());
                     courseMap.put("students", students);
+                    courseMap.put("grades", courseGrades);
+                    courseMap.put("certificates", courseCertificates);
                     courseMap.put("enrollmentCount", enrollments.size());
                     return courseMap;
                 })
                 .toList();
 
+        Map<String, Object> gradeStats = new LinkedHashMap<>();
+        gradeStats.put("totalGrades", teacherGrades.size());
+        gradeStats.put("passCount", teacherGrades.stream().filter(grade -> "PASS".equals(grade.getGradeStatus())).count());
+        gradeStats.put("failCount", teacherGrades.stream().filter(grade -> "FAIL".equals(grade.getGradeStatus())).count());
+        gradeStats.put("averageMarks", teacherGrades.stream().mapToDouble(Grade::getMarksObtained).average().orElse(0.0));
+
+        Map<String, Object> certificateStats = new LinkedHashMap<>();
+        certificateStats.put("totalCertificates", teacherCertificates.size());
+        certificateStats.put("pendingCertificates", teacherCertificates.stream().filter(certificate -> "PENDING".equals(certificate.getApprovalStatus())).count());
+        certificateStats.put("approvedCertificates", teacherCertificates.stream().filter(certificate -> "APPROVED".equals(certificate.getApprovalStatus())).count());
+        certificateStats.put("issuedCertificates", teacherCertificates.stream().filter(certificate -> "ISSUED".equals(certificate.getStatus())).count());
+
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("teacher", teacher);
         response.put("courses", courseDetails);
+        response.put("gradeStats", gradeStats);
+        response.put("certificateStats", certificateStats);
+        response.put("pendingCertificates", teacherCertificates.stream()
+                .filter(certificate -> "PENDING".equals(certificate.getApprovalStatus()))
+                .toList());
         response.put("allCourses", courseService.listCourses().stream()
                 .map(this::toCourseMap)
                 .toList());

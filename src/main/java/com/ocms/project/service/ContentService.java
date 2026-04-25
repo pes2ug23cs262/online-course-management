@@ -1,8 +1,10 @@
 package com.ocms.project.service;
 
+import java.util.List;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import java.util.List;
+
 import com.ocms.project.model.Content;
 import com.ocms.project.repository.ContentRepository;
 

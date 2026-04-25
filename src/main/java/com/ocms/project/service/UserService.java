@@ -1,5 +1,6 @@
 package com.ocms.project.service;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,6 +57,10 @@ public class UserService {
 
     public long countUsers() {
         return userRepository.count();
+    }
+
+    public List<User> findUsersByName(String name) {
+        return userRepository.findByName(name);
     }
 
     public UserSessionResponse buildSession(User user) {

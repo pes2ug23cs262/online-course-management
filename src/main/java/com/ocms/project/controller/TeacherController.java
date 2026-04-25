@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.ocms.project.model.Assignment;
+import com.ocms.project.model.Certificate;
 import com.ocms.project.model.CourseEntity;
 import com.ocms.project.model.EnrollmentRecord;
 import com.ocms.project.model.Grade;
@@ -132,20 +133,85 @@ public class TeacherController {
     }
 
     @PostMapping("/assignment/{assignmentId}/grade")
-    public String evaluateAssignment(@RequestParam Long studentId,
-                                     @RequestParam Long courseId,
-                                     @RequestParam Double marksObtained,
-                                     @RequestParam Double totalMarks,
-                                     @RequestParam Long teacherId,
-                                     @RequestParam(required = false) String feedback) {
-        Grade grade = gradingService.assignGrade(studentId, courseId, marksObtained, totalMarks, teacherId);
-        if (feedback != null) {
-            gradingService.updateGradeFeedback(grade.getGradeId(), feedback, "");
+    public Map<String, Object> evaluateAssignment(@PathVariable Long assignmentId,
+                                                  @RequestParam Long submissionId,
+                                                  @RequestParam Double marksObtained,
+                                                  @RequestParam(required = false) Double totalMarks,
+                                                  @RequestParam Long teacherId,
+                                                  @RequestParam(required = false) String feedback) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            Assignment assignment = assignmentService.getAssignmentById(assignmentId);
+            Submission submission = submissionService.getSubmissionById(submissionId);
+            if (assignment == null || submission == null || !assignmentId.equals(submission.getAssignmentId())) {
+                response.put("success", false);
+                response.put("message", "Assignment or submission not found.");
+                return response;
+            }
+
+            Double maxMarks = totalMarks != null ? totalMarks : assignment.getTotalMarks();
+            Grade grade = gradingService.assignGradeForSubmission(
+                    submissionId,
+                    submission.getStudentId(),
+                    assignment.getCourseId(),
+                    marksObtained,
+                    maxMarks,
+                    teacherId,
+                    feedback);
+
+            response.put("success", true);
+            response.put("message", "Student graded successfully.");
+            response.put("grade", grade);
+            response.put("submissionId", submissionId);
+            response.put("studentId", submission.getStudentId());
+            return response;
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Error grading submission: " + e.getMessage());
+            return response;
         }
-        if ("PASS".equals(grade.getGradeStatus())) {
-            certificateService.issueCertificate(studentId, courseId, marksObtained);
+    }
+
+    @PostMapping("/assignment/{assignmentId}/certificate/allot")
+    public Map<String, Object> allotCertificate(@PathVariable Long assignmentId,
+                                                @RequestParam Long submissionId,
+                                                @RequestParam Long teacherId) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            Assignment assignment = assignmentService.getAssignmentById(assignmentId);
+            Submission submission = submissionService.getSubmissionById(submissionId);
+            if (assignment == null || submission == null || !assignmentId.equals(submission.getAssignmentId())) {
+                response.put("success", false);
+                response.put("message", "Assignment or submission not found.");
+                return response;
+            }
+
+            Grade grade = gradingService.getGradeForSubmission(submissionId);
+            if (grade == null) {
+                response.put("success", false);
+                response.put("message", "Grade the student before allotting a certificate.");
+                return response;
+            }
+            if (!"PASS".equals(grade.getGradeStatus())) {
+                response.put("success", false);
+                response.put("message", "Certificate can only be allotted for passing grades.");
+                return response;
+            }
+
+            Certificate certificate = certificateService.generateCertificateForCompletion(
+                    submission.getStudentId(),
+                    assignment.getCourseId(),
+                    teacherId,
+                    grade.getMarksObtained());
+            response.put("success", true);
+            response.put("message", "Certificate allotted and moved to teacher approval.");
+            response.put("certificate", certificate);
+            return response;
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Error allotting certificate: " + e.getMessage());
+            return response;
         }
-        return "Evaluation completed. Grade ID: " + grade.getGradeId();
     }
 
     @PostMapping("/course/{courseId}/publish")
@@ -203,5 +269,154 @@ public class TeacherController {
     @GetMapping("/courses/{teacherId}")
     public List<CourseEntity> getTeacherCourses(@PathVariable Long teacherId) {
         return courseService.getCoursesByInstructor(teacherId);
+    }
+
+    // ===================== CERTIFICATE MANAGEMENT ENDPOINTS =====================
+
+    @GetMapping("/certificates/pending/{teacherId}")
+    public Map<String, Object> getPendingCertificatesForApproval(@PathVariable Long teacherId) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            List<com.ocms.project.model.Certificate> pendingCerts = certificateService.getPendingCertificatesForTeacher(teacherId);
+            response.put("success", true);
+            response.put("count", pendingCerts.size());
+            response.put("certificates", pendingCerts);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Error fetching pending certificates: " + e.getMessage());
+        }
+        return response;
+    }
+
+    @PostMapping("/certificate/{certificateId}/approve")
+    public Map<String, Object> approveCertificate(@PathVariable Long certificateId,
+                                                    @RequestParam Long teacherId,
+                                                    @RequestParam(required = false) String comments) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            com.ocms.project.model.Certificate cert = certificateService.approveCertificate(certificateId, teacherId, comments);
+            if (cert != null) {
+                response.put("success", true);
+                response.put("message", "Certificate approved successfully");
+                response.put("certificate", cert);
+            } else {
+                response.put("success", false);
+                response.put("message", "Certificate not found");
+            }
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Error approving certificate: " + e.getMessage());
+        }
+        return response;
+    }
+
+    @PostMapping("/certificate/{certificateId}/reject")
+    public Map<String, Object> rejectCertificate(@PathVariable Long certificateId,
+                                                   @RequestParam Long teacherId,
+                                                   @RequestParam String reason) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            com.ocms.project.model.Certificate cert = certificateService.rejectCertificate(certificateId, teacherId, reason);
+            if (cert != null) {
+                response.put("success", true);
+                response.put("message", "Certificate rejected successfully");
+                response.put("certificate", cert);
+            } else {
+                response.put("success", false);
+                response.put("message", "Certificate not found");
+            }
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Error rejecting certificate: " + e.getMessage());
+        }
+        return response;
+    }
+
+    @PostMapping("/certificate/{certificateId}/send")
+    public Map<String, Object> sendCertificateToStudent(@PathVariable Long certificateId) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            com.ocms.project.model.Certificate cert = certificateService.sendCertificateToStudent(certificateId);
+            if (cert != null) {
+                response.put("success", true);
+                response.put("message", "Certificate sent to student successfully");
+                response.put("sentDate", cert.getSentDate());
+                response.put("studentId", cert.getStudentId());
+                response.put("certificate", cert);
+            } else {
+                response.put("success", false);
+                response.put("message", "Certificate not found or not approved");
+            }
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Error sending certificate: " + e.getMessage());
+        }
+        return response;
+    }
+
+    @PostMapping("/certificate/generate/{studentId}/{courseId}")
+    public Map<String, Object> generateCertificateForCompletion(@PathVariable Long studentId,
+                                                                  @PathVariable Long courseId,
+                                                                  @RequestParam Long teacherId,
+                                                                  @RequestParam Double finalScore) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            com.ocms.project.model.Certificate cert = certificateService.generateCertificateForCompletion(studentId, courseId, teacherId, finalScore);
+            response.put("success", true);
+            response.put("message", "Certificate generated for course completion");
+            response.put("certificateId", cert.getCertificateId());
+            response.put("certificate", cert);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Error generating certificate: " + e.getMessage());
+        }
+        return response;
+    }
+
+    @GetMapping("/certificate/{certificateId}")
+    public Map<String, Object> viewCertificateDetails(@PathVariable Long certificateId) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            com.ocms.project.model.Certificate cert = certificateService.getCertificateById(certificateId);
+            if (cert != null) {
+                response.put("success", true);
+                response.put("certificate", cert);
+            } else {
+                response.put("success", false);
+                response.put("message", "Certificate not found");
+            }
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Error fetching certificate: " + e.getMessage());
+        }
+        return response;
+    }
+
+    @GetMapping("/certificate/{certificateId}/formatted")
+    public Map<String, Object> getCertificateFormatted(@PathVariable Long certificateId,
+                                                        @RequestParam(required = false) String withSignature) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            com.ocms.project.model.Certificate cert = certificateService.getCertificateById(certificateId);
+            if (cert != null) {
+                String formattedContent;
+                if ("true".equals(withSignature)) {
+                    String teacherName = "Teacher"; // You can fetch from userRepository if needed
+                    formattedContent = certificateService.generateCertificateWithSignature(certificateId, teacherName);
+                } else {
+                    formattedContent = certificateService.generateCertificateWithSignature(certificateId, "");
+                }
+                response.put("success", true);
+                response.put("content", formattedContent);
+                response.put("badge", certificateService.generateCertificateWithBadge(certificateId));
+            } else {
+                response.put("success", false);
+                response.put("message", "Certificate not found");
+            }
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Error formatting certificate: " + e.getMessage());
+        }
+        return response;
     }
 }

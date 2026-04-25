@@ -18,22 +18,32 @@ public class Certificate {
 
     private Long studentId;
     private Long courseId;
+    private Long teacherId;
     private String certificateNumber;
     private Date issuanceDate;
     private String certificateUrl;
-    private String status; // ISSUED, REVOKED, EXPIRED
+    private String status; // PENDING, APPROVED, REJECTED, ISSUED, REVOKED, EXPIRED
     private Double finalScore;
+    
+    // Approval fields
+    private String approvalStatus; // PENDING, APPROVED, REJECTED
+    private Long approvedBy; // Teacher ID who approved
+    private Date approvalDate;
+    private String approvalComments;
+    private Date sentDate; // When certificate was sent to student
 
     // Constructors
     public Certificate() {}
 
-    public Certificate(Long studentId, Long courseId, Double finalScore) {
+    public Certificate(Long studentId, Long courseId, Long teacherId, Double finalScore) {
         this.studentId = studentId;
         this.courseId = courseId;
+        this.teacherId = teacherId;
         this.finalScore = finalScore;
         this.certificateNumber = "CERT-" + System.currentTimeMillis();
         this.issuanceDate = new Date();
-        this.status = "ISSUED";
+        this.status = "PENDING";
+        this.approvalStatus = "PENDING";
     }
 
     // Getters & Setters
@@ -45,6 +55,9 @@ public class Certificate {
 
     public Long getCourseId() { return courseId; }
     public void setCourseId(Long courseId) { this.courseId = courseId; }
+
+    public Long getTeacherId() { return teacherId; }
+    public void setTeacherId(Long teacherId) { this.teacherId = teacherId; }
 
     public String getCertificateNumber() { return certificateNumber; }
     public void setCertificateNumber(String certificateNumber) { this.certificateNumber = certificateNumber; }
@@ -60,4 +73,19 @@ public class Certificate {
 
     public Double getFinalScore() { return finalScore; }
     public void setFinalScore(Double finalScore) { this.finalScore = finalScore; }
+
+    public String getApprovalStatus() { return approvalStatus; }
+    public void setApprovalStatus(String approvalStatus) { this.approvalStatus = approvalStatus; }
+
+    public Long getApprovedBy() { return approvedBy; }
+    public void setApprovedBy(Long approvedBy) { this.approvedBy = approvedBy; }
+
+    public Date getApprovalDate() { return approvalDate; }
+    public void setApprovalDate(Date approvalDate) { this.approvalDate = approvalDate; }
+
+    public String getApprovalComments() { return approvalComments; }
+    public void setApprovalComments(String approvalComments) { this.approvalComments = approvalComments; }
+
+    public Date getSentDate() { return sentDate; }
+    public void setSentDate(Date sentDate) { this.sentDate = sentDate; }
 }

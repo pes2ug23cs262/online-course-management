@@ -32,6 +32,10 @@ public class CourseService {
         return courseRepository.findByInstructorId(instructorId);
     }
 
+    public List<CourseEntity> findCoursesByTitle(String title) {
+        return courseRepository.findByTitle(title);
+    }
+
     public List<CourseEntity> getCoursesByStatus(CourseStatus status) {
         return courseRepository.findByStatus(status);
     }

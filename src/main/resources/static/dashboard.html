@@ -564,22 +564,54 @@
         }
 
         function renderTeacherDashboard(data) {
+            const gradeStats = data.gradeStats || {};
+            const certificateStats = data.certificateStats || {};
             renderStats([
                 { label: 'My Courses', value: (data.courses || []).length },
-                { label: 'All Courses', value: (data.allCourses || []).length },
-                { label: 'Published', value: (data.courses || []).filter(course => course.status === 'PUBLISHED').length },
-                { label: 'Approved', value: (data.courses || []).filter(course => course.status === 'APPROVED').length }
+                { label: 'Grade Statistics', value: gradeStats.totalGrades ?? 0 },
+                { label: 'Certificate Statistics', value: certificateStats.totalCertificates ?? 0 },
+                { label: 'Pending Approval', value: certificateStats.pendingCertificates ?? 0 }
             ]);
 
             document.getElementById('teacherCoursesContainer').innerHTML = (data.courses || []).length === 0
-                ? '<p style="color: var(--muted);">No courses created yet.</p>'
-                : data.courses.map(course => renderTeacherCourseCard(course)).join('');
+                ? `
+                    ${renderTeacherStatsPanel(data)}
+                    <p style="color: var(--muted);">No courses created yet.</p>
+                `
+                : `
+                    ${renderTeacherStatsPanel(data)}
+                    ${data.courses.map(course => renderTeacherCourseCard(course)).join('')}
+                `;
+        }
+
+        function renderTeacherStatsPanel(data) {
+            const gradeStats = data.gradeStats || {};
+            const certificateStats = data.certificateStats || {};
+            return `
+                <div class="section-grid" style="margin-bottom: 22px;">
+                    <div class="section" style="margin-bottom: 0;">
+                        <h2>Grade Statistics</h2>
+                        <div style="color: var(--muted);">Average score: ${Number(gradeStats.averageMarks || 0).toFixed(2)}</div>
+                        <div style="margin-top: 12px;">Total graded submissions: <strong>${gradeStats.totalGrades ?? 0}</strong></div>
+                        <div style="margin-top: 8px;">Pass count: <strong>${gradeStats.passCount ?? 0}</strong></div>
+                        <div style="margin-top: 8px;">Fail count: <strong>${gradeStats.failCount ?? 0}</strong></div>
+                    </div>
+                    <div class="section" style="margin-bottom: 0;">
+                        <h2>Certificate Statistics</h2>
+                        <div style="margin-top: 12px;">Generated: <strong>${certificateStats.totalCertificates ?? 0}</strong></div>
+                        <div style="margin-top: 8px;">Pending teacher approval: <strong>${certificateStats.pendingCertificates ?? 0}</strong></div>
+                        <div style="margin-top: 8px;">Approved: <strong>${certificateStats.approvedCertificates ?? 0}</strong></div>
+                        <div style="margin-top: 8px;">Sent to students: <strong>${certificateStats.issuedCertificates ?? 0}</strong></div>
+                    </div>
+                </div>
+            `;
         }
 
         function renderTeacherCourseCard(course) {
             const contents = course.contents || [];
             const assignments = course.assignments || [];
             const students = course.students || [];
+            const certificates = course.certificates || [];
             return `
                 <div style="border: 1px solid #e5e7eb; border-radius: 16px; padding: 18px; margin-bottom: 18px;">
                     <h3 style="margin: 0 0 8px 0;">${course.title}</h3>
@@ -615,6 +647,49 @@
                                 <div style="border: 1px solid #f3f4f6; border-radius: 10px; padding: 12px; margin-bottom: 10px;">
                                     <strong>${entry.assignment.title}</strong>
                                     <div style="color: var(--muted); margin: 4px 0;">Due: ${formatDate(entry.assignment.deadline)} | Submissions: ${(entry.submissions || []).length}</div>
+                                    <div style="margin-top: 12px;">
+                                        ${(entry.submissions || []).length === 0
+                                            ? '<div style="color: var(--muted);">Students have not submitted this assignment yet.</div>'
+                                            : entry.submissions.map(item => {
+                                                const submission = item.submission || {};
+                                                const user = item.user || {};
+                                                const grade = item.grade;
+                                                const certificate = item.certificate;
+                                                return `
+                                                    <div style="border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; margin-top: 10px; background: #f8fafc;">
+                                                        <div style="display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+                                                            <div>
+                                                                <strong>${user.name || ('Student #' + submission.studentId)}</strong>
+                                                                <div style="color: var(--muted); margin-top: 4px;">${user.email || ''}</div>
+                                                                <div style="color: var(--muted); margin-top: 4px;">Submitted: ${formatDate(submission.submissionDate)} | Status: ${submission.status || 'SUBMITTED'}</div>
+                                                            </div>
+                                                            <div class="pill">${grade ? ('Grade: ' + (grade.marksObtained ?? 0) + '/' + (grade.totalMarks ?? entry.assignment.totalMarks)) : 'Not graded yet'}</div>
+                                                        </div>
+                                                        <div style="margin-top: 10px; color: #111827;">${submission.submissionContent || 'No submission content.'}</div>
+                                                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px;">
+                                                            <input id="grade-marks-${submission.submissionId}" type="number" min="0" step="0.01" placeholder="Marks obtained" value="${grade?.marksObtained ?? ''}">
+                                                            <input id="grade-total-${submission.submissionId}" type="number" min="1" step="0.01" placeholder="Total marks" value="${grade?.totalMarks ?? entry.assignment.totalMarks ?? ''}">
+                                                        </div>
+                                                        <textarea id="grade-feedback-${submission.submissionId}" placeholder="Teacher feedback" style="width: 100%; min-height: 70px; margin-top: 10px; padding: 10px; border: 1px solid #d1d5db; border-radius: 8px;">${grade?.feedback || ''}</textarea>
+                                                        <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px;">
+                                                            <button class="small-button primary" onclick="gradeTeacherSubmission(${entry.assignment.assignmentId}, ${submission.submissionId})">Save Grade</button>
+                                                            <button class="small-button success" onclick="allotTeacherCertificate(${entry.assignment.assignmentId}, ${submission.submissionId})">Allot Certificate</button>
+                                                            ${certificate && certificate.approvalStatus === 'PENDING'
+                                                                ? `<button class="small-button secondary" onclick="approveTeacherCertificate(${certificate.certificateId})">Approve Certificate</button>`
+                                                                : ''}
+                                                            ${certificate && certificate.approvalStatus === 'APPROVED' && certificate.status !== 'ISSUED'
+                                                                ? `<button class="small-button success" onclick="sendTeacherCertificate(${certificate.certificateId})">Send To Student</button>`
+                                                                : ''}
+                                                        </div>
+                                                        <div style="margin-top: 10px; color: var(--muted);">
+                                                            ${certificate
+                                                                ? `Certificate: ${certificate.certificateNumber} | Approval: ${certificate.approvalStatus} | Status: ${certificate.status}`
+                                                                : 'Certificate not allotted yet.'}
+                                                        </div>
+                                                    </div>
+                                                `;
+                                            }).join('')}
+                                    </div>
                                 </div>
                             `).join('')}
                     </div>
@@ -624,8 +699,74 @@
                             ? '<p style="color: var(--muted); margin: 0;">No enrolled students yet.</p>'
                             : students.map(item => `<div style="margin-bottom: 8px;">${item.user.name} (${item.user.email}) - ${item.enrollment.status}, ${Number(item.enrollment.progress || 0).toFixed(0)}%</div>`).join('')}
                     </div>
+                    <div style="margin-top: 16px;">
+                        <h4 style="margin: 0 0 8px 0;">Certificates</h4>
+                        ${certificates.length === 0
+                            ? '<p style="color: var(--muted); margin: 0;">No certificates allotted for this course yet.</p>'
+                            : certificates.map(certificate => `<div style="margin-bottom: 8px;">${certificate.certificateNumber} - Student #${certificate.studentId} - ${certificate.approvalStatus} / ${certificate.status}</div>`).join('')}
+                    </div>
                 </div>
             `;
+        }
+
+        async function gradeTeacherSubmission(assignmentId, submissionId) {
+            const marks = document.getElementById(`grade-marks-${submissionId}`).value.trim();
+            const totalMarks = document.getElementById(`grade-total-${submissionId}`).value.trim();
+            const feedback = document.getElementById(`grade-feedback-${submissionId}`).value.trim();
+            if (!marks || !totalMarks) {
+                showMessage('Enter both obtained marks and total marks before grading.', 'error');
+                return;
+            }
+            try {
+                const params = new URLSearchParams({
+                    submissionId,
+                    marksObtained: marks,
+                    totalMarks,
+                    teacherId: currentUser.teacherId
+                });
+                if (feedback) {
+                    params.set('feedback', feedback);
+                }
+                const response = await requestJson(`${API_BASE}/teacher/assignment/${assignmentId}/grade?${params.toString()}`, { method: 'POST' });
+                showMessage(response.message || 'Grade saved successfully.', 'success');
+                await refreshDashboard();
+            } catch (error) {
+                console.error(error);
+                showMessage(error.message || 'Could not save grade.', 'error');
+            }
+        }
+
+        async function allotTeacherCertificate(assignmentId, submissionId) {
+            try {
+                const response = await requestJson(`${API_BASE}/teacher/assignment/${assignmentId}/certificate/allot?submissionId=${submissionId}&teacherId=${currentUser.teacherId}`, { method: 'POST' });
+                showMessage(response.message || 'Certificate allotted successfully.', 'success');
+                await refreshDashboard();
+            } catch (error) {
+                console.error(error);
+                showMessage(error.message || 'Could not allot certificate.', 'error');
+            }
+        }
+
+        async function approveTeacherCertificate(certificateId) {
+            try {
+                const response = await requestJson(`${API_BASE}/teacher/certificate/${certificateId}/approve?teacherId=${currentUser.teacherId}&comments=${encodeURIComponent('Approved by teacher')}`, { method: 'POST' });
+                showMessage(response.message || 'Certificate approved successfully.', 'success');
+                await refreshDashboard();
+            } catch (error) {
+                console.error(error);
+                showMessage(error.message || 'Could not approve certificate.', 'error');
+            }
+        }
+
+        async function sendTeacherCertificate(certificateId) {
+            try {
+                const response = await requestJson(`${API_BASE}/teacher/certificate/${certificateId}/send`, { method: 'POST' });
+                showMessage(response.message || 'Certificate sent to student.', 'success');
+                await refreshDashboard();
+            } catch (error) {
+                console.error(error);
+                showMessage(error.message || 'Could not send certificate.', 'error');
+            }
         }
 
         function renderAdminDashboard(data) {
@@ -643,9 +784,60 @@
                 <div class="stat"><h3>System Status</h3><p>${stats.status ?? 'Operational'}</p></div>
             `;
 
-            document.getElementById('adminCoursesContainer').innerHTML = (data.courses || []).length === 0
-                ? '<p style="color: var(--muted);">No courses available to manage.</p>'
-                : data.courses.map(course => `
+            // Build HTML content
+            let htmlContent = '';
+
+            // Add Reports Toolbar
+            const courseOptions = (data.courses || []).map(c => `<option value="${c.title}">${c.title}</option>`).join('');
+            htmlContent += `
+                <div style="border: 1px solid #e5e7eb; border-radius: 14px; padding: 18px; margin-bottom: 16px; background: linear-gradient(135deg, #f0f9ff 0%, #fef3c7 100%);">
+                    <h3 style="margin: 0 0 14px 0; color: #1e40af;">📊 Generate Reports</h3>
+                    <div style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
+                        <div style="flex: 1; min-width: 200px;">
+                            <label style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.9rem;">Select Course</label>
+                            <select id="adminCourseSelect" style="width: 100%; padding: 12px 14px; border: 1px solid #d1d5db; border-radius: 12px; font-size: 1rem;">
+                                <option value="">-- Choose a course --</option>
+                                ${courseOptions}
+                            </select>
+                        </div>
+                        <button class="small-button primary" style="padding: 12px 24px;" onclick="generateSimpleReport()">Generate Report</button>
+                        <button class="small-button secondary" style="padding: 12px 24px;" onclick="viewAllReports()">View All Reports</button>
+                    </div>
+                </div>
+            `;
+
+            // Report Results Section
+            htmlContent += `
+                <div id="reportResultsPanel" class="hidden" style="border: 1px solid #10b981; border-radius: 14px; padding: 18px; margin-bottom: 16px; background: #f0fdf4;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <h3 style="margin: 0; color: #065f46;">Report Generated</h3>
+                        <button class="small-button secondary" onclick="hideReportResults()">Close</button>
+                    </div>
+                    <div style="background: white; border-radius: 10px; padding: 16px; border: 1px solid #d1fae5; max-height: 500px; overflow-y: auto;">
+                        <pre id="reportContent" style="margin: 0; white-space: pre-wrap; word-wrap: break-word; font-size: 0.9rem; color: #1f2937;"></pre>
+                    </div>
+                    <button class="small-button success" style="margin-top: 12px;" onclick="downloadReport()">Download Report</button>
+                </div>
+            `;
+
+            // Reports View Section
+            htmlContent += `
+                <div id="reportsViewPanel" class="hidden" style="border: 1px solid #e5e7eb; border-radius: 14px; padding: 18px; margin-bottom: 16px; background: white;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <h3 style="margin: 0;">Generated Reports</h3>
+                        <button class="small-button secondary" onclick="hideReportsPanel()">Close</button>
+                    </div>
+                    <div id="reportsListContainer" style="max-height: 400px; overflow-y: auto;"></div>
+                </div>
+            `;
+
+            // Add Courses Section
+            htmlContent += `<h3 style="margin-top: 24px; margin-bottom: 16px;">Manage Courses</h3>`;
+            
+            if ((data.courses || []).length === 0) {
+                htmlContent += '<p style="color: var(--muted);">No courses available to manage.</p>';
+            } else {
+                htmlContent += data.courses.map(course => `
                     <div style="border: 1px solid #e5e7eb; border-radius: 14px; padding: 18px; margin-bottom: 16px; background: #fff;">
                         <h3 style="margin: 0 0 8px 0;">${course.title} (${course.status})</h3>
                         <p style="margin: 0 0 8px 0; color: var(--muted);">Instructor: ${course.instructorName || 'Unknown'} | Price: ${formatMoney(course.price)}</p>
@@ -654,6 +846,9 @@
                         <button class="small-button danger" style="margin-left: 10px;" onclick="removeCourse(${course.courseId})">Remove</button>
                     </div>
                 `).join('');
+            }
+
+            document.getElementById('adminCoursesContainer').innerHTML = htmlContent;
         }
 
         function toggleInlineForm(id) {
@@ -816,6 +1011,141 @@
                 console.error(error);
                 showMessage(error.message || 'Could not remove course.', 'error');
             }
+        }
+
+        // ===================== REPORT GENERATION FUNCTIONS =====================
+
+        let currentReport = null;
+
+        async function generateSimpleReport() {
+            const courseTitle = document.getElementById('adminCourseSelect').value.trim();
+            if (!courseTitle) {
+                showMessage('Please select a course.', 'error');
+                return;
+            }
+
+            const params = new URLSearchParams();
+            params.set('adminId', currentUser.adminId);
+            params.set('reportType', 'COURSE_OVERVIEW');
+            params.set('courseTitle', courseTitle);
+
+            console.log('Generating report for course:', courseTitle, 'Admin:', currentUser.adminId);
+            await generateReport(`${API_BASE}/admin/report/generate?${params.toString()}`, `${courseTitle} Report`);
+        }
+
+        async function generateReport(url, reportTitle) {
+            try {
+                showMessage('Generating report...', 'success');
+                console.log('Report URL:', url);
+                const response = await requestJson(url, { method: 'POST' });
+                console.log('Report response:', response);
+                
+                if (response.success) {
+                    currentReport = {
+                        title: reportTitle,
+                        content: response.reportContent,
+                        reportId: response.reportId,
+                        timestamp: new Date().toLocaleString()
+                    };
+                    
+                    displayReportResults();
+                    showMessage('Report generated successfully! Check view all reports.', 'success');
+                    setTimeout(() => viewAllReports(), 500);
+                } else {
+                    showMessage(response.message || 'Failed to generate report.', 'error');
+                    console.error('Report generation failed:', response.message);
+                }
+            } catch (error) {
+                console.error('Report error:', error);
+                showMessage(error.message || 'Could not generate report.', 'error');
+            }
+        }
+
+        function displayReportResults() {
+            if (!currentReport) return;
+            
+            const panel = document.getElementById('reportResultsPanel');
+            document.getElementById('reportContent').textContent = `
+${currentReport.title}
+Generated: ${currentReport.timestamp}
+Report ID: ${currentReport.reportId}
+${'='.repeat(60)}
+
+${currentReport.content}
+            `.trim();
+            
+            panel.classList.remove('hidden');
+        }
+
+        function hideReportResults() {
+            document.getElementById('reportResultsPanel').classList.add('hidden');
+            currentReport = null;
+        }
+
+        function downloadReport() {
+            if (!currentReport) return;
+            
+            const content = `${currentReport.title}\nGenerated: ${currentReport.timestamp}\nReport ID: ${currentReport.reportId}\n${'='.repeat(60)}\n\n${currentReport.content}`;
+            const element = document.createElement('a');
+            element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(content));
+            element.setAttribute('download', `Report_${currentReport.reportId}_${Date.now()}.txt`);
+            element.style.display = 'none';
+            document.body.appendChild(element);
+            element.click();
+            document.body.removeChild(element);
+            showMessage('Report downloaded successfully!', 'success');
+        }
+
+        async function viewAllReports() {
+            try {
+                console.log('Fetching reports for admin:', currentUser.adminId);
+                const response = await requestJson(`${API_BASE}/admin/reports/${currentUser.adminId}`, { method: 'GET' });
+                console.log('Reports response:', response);
+                
+                if (response.success) {
+                    const panel = document.getElementById('reportsViewPanel');
+                    const container = document.getElementById('reportsListContainer');
+                    
+                    console.log('Number of reports:', response.reports ? response.reports.length : 0);
+                    if (response.reports && response.reports.length > 0) {
+                        container.innerHTML = response.reports.map((report, index) => `
+                            <div style="border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; margin-bottom: 12px; background: #f9fafb;">
+                                <div style="display: flex; justify-content: space-between; align-items: start;">
+                                    <div>
+                                        <h4 style="margin: 0 0 6px 0;">${report.reportType}</h4>
+                                        <p style="margin: 0 0 4px 0; font-size: 0.85rem; color: var(--muted);">
+                                            Report ID: ${report.reportId}
+                                        </p>
+                                        <p style="margin: 0; font-size: 0.85rem; color: var(--muted);">
+                                            Generated: ${formatDate(report.generatedDate)} | Status: ${report.status}
+                                        </p>
+                                    </div>
+                                    <button class="small-button secondary" style="font-size: 0.85rem;" onclick="viewReportDetails(${index})">View</button>
+                                </div>
+                            </div>
+                        `).join('');
+                    } else {
+                        container.innerHTML = '<p style="color: var(--muted); margin: 0;">No reports generated yet.</p>';
+                    }
+                    
+                    panel.classList.remove('hidden');
+                } else {
+                    showMessage(response.message || 'Could not load reports.', 'error');
+                    console.error('Error loading reports:', response.message);
+                }
+            } catch (error) {
+                console.error('Reports fetch error:', error);
+                showMessage(error.message || 'Could not load reports.', 'error');
+            }
+        }
+
+        function hideReportsPanel() {
+            document.getElementById('reportsViewPanel').classList.add('hidden');
+        }
+
+        function viewReportDetails(index) {
+            // This can be enhanced to show full report details
+            showMessage('Report details feature coming soon.', 'success');
         }
     </script>
 </body>

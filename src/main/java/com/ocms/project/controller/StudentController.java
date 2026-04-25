@@ -137,4 +137,135 @@ public class StudentController {
     public Double getStudentGPA(@PathVariable Long studentId) {
         return gradingService.calculateCourseGPA(studentId);
     }
+
+    // ===================== ENHANCED CERTIFICATE MANAGEMENT ENDPOINTS =====================
+
+    @GetMapping("/{studentId}/certificates/issued")
+    public java.util.Map<String, Object> getIssuedCertificates(@PathVariable Long studentId) {
+        java.util.Map<String, Object> response = new java.util.HashMap<>();
+        try {
+            List<Certificate> certificates = certificateService.getIssuedCertificates(studentId);
+            response.put("success", true);
+            response.put("count", certificates.size());
+            response.put("certificates", certificates);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Error fetching issued certificates: " + e.getMessage());
+        }
+        return response;
+    }
+
+    @GetMapping("/{studentId}/certificates/pending")
+    public java.util.Map<String, Object> getPendingCertificates(@PathVariable Long studentId) {
+        java.util.Map<String, Object> response = new java.util.HashMap<>();
+        try {
+            List<Certificate> allCerts = certificateService.getStudentCertificates(studentId);
+            List<Certificate> pendingCerts = allCerts.stream()
+                    .filter(c -> "PENDING".equals(c.getApprovalStatus()))
+                    .toList();
+            response.put("success", true);
+            response.put("count", pendingCerts.size());
+            response.put("certificates", pendingCerts);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Error fetching pending certificates: " + e.getMessage());
+        }
+        return response;
+    }
+
+    @GetMapping("/certificate/{certificateId}/view")
+    public java.util.Map<String, Object> viewCertificateDetails(@PathVariable Long certificateId) {
+        java.util.Map<String, Object> response = new java.util.HashMap<>();
+        try {
+            Certificate cert = certificateService.getCertificateById(certificateId);
+            if (cert != null) {
+                response.put("success", true);
+                response.put("certificate", cert);
+                response.put("certificateNumber", cert.getCertificateNumber());
+                response.put("issuanceDate", cert.getIssuanceDate());
+                response.put("approvalStatus", cert.getApprovalStatus());
+                response.put("status", cert.getStatus());
+            } else {
+                response.put("success", false);
+                response.put("message", "Certificate not found");
+            }
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Error viewing certificate: " + e.getMessage());
+        }
+        return response;
+    }
+
+    @GetMapping("/certificate/{certificateId}/download")
+    public java.util.Map<String, Object> downloadCertificate(@PathVariable Long certificateId) {
+        java.util.Map<String, Object> response = new java.util.HashMap<>();
+        try {
+            Certificate cert = certificateService.getCertificateById(certificateId);
+            if (cert != null && "ISSUED".equals(cert.getStatus())) {
+                String certificateContent = certificateService.generateCertificateWithSignature(certificateId, "");
+                String badge = certificateService.generateCertificateWithBadge(certificateId);
+                response.put("success", true);
+                response.put("message", "Certificate ready for download");
+                response.put("certificateContent", certificateContent);
+                response.put("badge", badge);
+                response.put("fileName", "Certificate_" + cert.getCertificateNumber() + ".pdf");
+            } else if (cert != null) {
+                response.put("success", false);
+                response.put("message", "Certificate is not yet issued. Status: " + cert.getStatus());
+            } else {
+                response.put("success", false);
+                response.put("message", "Certificate not found");
+            }
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Error downloading certificate: " + e.getMessage());
+        }
+        return response;
+    }
+
+    @GetMapping("/{studentId}/certificates/by-course/{courseId}")
+    public java.util.Map<String, Object> getCertificateForCourse(@PathVariable Long studentId,
+                                                                   @PathVariable Long courseId) {
+        java.util.Map<String, Object> response = new java.util.HashMap<>();
+        try {
+            Certificate cert = certificateService.getCertificateByCourseStudent(courseId, studentId);
+            if (cert != null) {
+                response.put("success", true);
+                response.put("certificate", cert);
+                response.put("status", cert.getStatus());
+                response.put("approvalStatus", cert.getApprovalStatus());
+            } else {
+                response.put("success", false);
+                response.put("message", "No certificate found for this course");
+            }
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Error fetching certificate: " + e.getMessage());
+        }
+        return response;
+    }
+
+    @GetMapping("/{studentId}/certificate-status")
+    public java.util.Map<String, Object> getCertificateStatus(@PathVariable Long studentId) {
+        java.util.Map<String, Object> response = new java.util.HashMap<>();
+        try {
+            List<Certificate> certificates = certificateService.getStudentCertificates(studentId);
+            
+            long issued = certificates.stream().filter(c -> "ISSUED".equals(c.getStatus())).count();
+            long pending = certificates.stream().filter(c -> "PENDING".equals(c.getStatus())).count();
+            long approved = certificates.stream().filter(c -> "APPROVED".equals(c.getApprovalStatus())).count();
+            long rejected = certificates.stream().filter(c -> "REJECTED".equals(c.getApprovalStatus())).count();
+            
+            response.put("success", true);
+            response.put("totalCertificates", certificates.size());
+            response.put("issued", issued);
+            response.put("pending", pending);
+            response.put("approved", approved);
+            response.put("rejected", rejected);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Error fetching certificate status: " + e.getMessage());
+        }
+        return response;
+    }
 }

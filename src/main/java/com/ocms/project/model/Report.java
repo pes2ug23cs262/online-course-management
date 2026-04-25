@@ -2,6 +2,7 @@ package com.ocms.project.model;
 
 import java.util.Date;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -19,6 +20,7 @@ public class Report {
     private String reportType; // STUDENT_PERFORMANCE, COURSE_ANALYTICS, ENROLLMENT_STATS, PAYMENT_REPORT
     private Long generatedBy; // Admin ID
     private Date generatedDate;
+    @Column(columnDefinition = "TEXT")
     private String reportContent;
     private String filePath;
     private String status; // GENERATED, ARCHIVED
